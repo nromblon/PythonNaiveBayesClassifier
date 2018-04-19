@@ -105,4 +105,5 @@ print(confusion_matrix(test_labels,result2))
 print(result3)
 
 export_to_csv("MultinomialNB.csv", generate_result_dict(test_labels, result1))
+
 export_to_csv("ConfusionMatrix.csv", confusion_matrix(test_labels, result1))
