@@ -27,6 +27,10 @@ class Application(tk.Frame):
         self.predicted_label = None
         self.actual_label = None
         self.email_text = None
+        self.truepositive_lbl = None
+        self.falsenegative_lbl = None
+        self.truenegative_lbl = None
+        self.falsepositive_lbl = None
         # init naive bayes variables
         self.train_dirs = None
         self.train_dict = {}
@@ -84,7 +88,7 @@ class Application(tk.Frame):
         testButton.pack()
 
         # left frame
-        leftFrame = tk.Frame(self, bg="red")
+        leftFrame = tk.Frame(self)
         leftFrame.pack(expand=True, fill='both', side='right')
 
         # email traversal
@@ -100,7 +104,7 @@ class Application(tk.Frame):
 
         # email viewer
         viewer_frame = tk.Frame(leftFrame)
-        viewer_frame.pack(fill='both', expand=True, side='left')
+        viewer_frame.pack(fill='both', expand=True, side='top')
         self.predicted_label = tk.Label(viewer_frame, text="Predicted: ")
         self.predicted_label.pack()
         self.actual_label = tk.Label(viewer_frame, text="Actual: ")
@@ -117,17 +121,46 @@ class Application(tk.Frame):
         email_scrollbar.config(command=self.email_text.yview)
         # end of email body frame
 
+        # summary
+        summary_frame = tk.Frame(leftFrame)
+        summary_frame.pack(fill='x', expand=True, side='top')
+        saveresults_button = tk.Button(summary_frame, text="Export results to CSV", command=self.export_results)
+        saveresults_button.pack(side='bottom')
+        left_summary_frame = tk.Frame(summary_frame)
+        left_summary_frame.pack(fill='both', expand=True, side='left')
+        self.truepositive_lbl = tk.Label(left_summary_frame, text="True Positives: ")
+        self.truepositive_lbl.pack()
+        self.falsenegative_lbl = tk.Label(left_summary_frame, text="False Negatives: ")
+        self.falsenegative_lbl.pack()
+        right_summary_frame = tk.Frame(summary_frame)
+        right_summary_frame.pack(fill='both', expand=True, side='left')
+        self.falsepositive_lbl = tk.Label(right_summary_frame, text="False Positives: ")
+        self.falsepositive_lbl.pack()
+        self.truenegative_lbl = tk.Label(right_summary_frame, text="True Negatives: ")
+        self.truenegative_lbl.pack()
+
     def email_onselect(self, event):
         index = self.view_listBox.curselection()
         file = self.view_listBox.get(index)
         self.email_text.delete(1.0, 'end')
         with open(file, 'r') as m:
             self.email_text.insert('end', m.read())
-            print(m.read())
+
         res_text = "Spam" if self.result[index] == 1 else "Not Spam"
         self.predicted_label.config(text="Predicted: " + res_text)
         res_text = "Spam" if self.test_labels[index] == 1 else "Not Spam"
         self.actual_label.config(text="Actual: " + res_text)
+
+    def export_results(self):
+        dlg = fd.asksaveasfile(defaultextension='.csv', title="Save File", filetypes=[("CSV file", "*.csv")])
+        filename = dlg.name
+        print(filename)
+        if not filename:
+            return
+
+        data = self.generate_confusion_dict(self.result_matrix) + ["",""] \
+               + self.generate_result_dict(self.test_labels, self.result)
+        self.export_to_csv(filename, data)
 
     def browse_train(self):
         self.training_list = list(fd.askopenfilenames())
@@ -158,7 +191,6 @@ class Application(tk.Frame):
         self.train_model.fit(self.train_matrix, self.train_labels)
         self.trainState_Label.config(text="Training Complete!")
 
-
     def test(self):
         # prepare labels and feature vectors for each test mail
         self.test_matrix = self.extract_features(self.test_list, self.train_dict)
@@ -169,12 +201,18 @@ class Application(tk.Frame):
                 self.test_labels[i] = 1
 
         self.result = self.train_model.predict(self.test_matrix)
+        self.result_matrix = confusion_matrix(self.test_labels, self.result)
         print(self.result)
-        print(confusion_matrix(self.test_labels, self.result))
+        print(self.result_matrix)
 
         self.view_listBox.delete(0, 'end')
         for file in self.test_list:
             self.view_listBox.insert('end', file)
+
+        self.truepositive_lbl.config(text="True Positive: "+str(self.result_matrix[1][1]))
+        self.falsepositive_lbl.config(text="False Positive: "+str(self.result_matrix[0][1]))
+        self.truenegative_lbl.config(text="True Negative: "+str(self.result_matrix[0][0]))
+        self.falsenegative_lbl.config(text="False Negative: "+str(self.result_matrix[1][0]))
 
     # ---NaiveBayes Util Functions
     @staticmethod
@@ -226,9 +264,17 @@ class Application(tk.Frame):
 
     @staticmethod
     def generate_result_dict(actual, predicted):
-        data = [["", "Actual", "Predicted"]];
+        data = [["", "Actual", "Predicted"]]
         for i in range(0, len(actual)):
             data.append(["Email " + str(i), str(actual[i]), str(predicted[i])])
+
+        return data
+
+    @staticmethod
+    def generate_confusion_dict(confusion):
+        data = [["", "", "Predicted", ""], ["", "", "Not Spam", "Spam"],
+                ["Actual", "Not Spam", confusion[0][0], confusion[0][1]],
+                ["", "Spam", confusion[1][0], confusion[1][1]]]
 
         return data
 
