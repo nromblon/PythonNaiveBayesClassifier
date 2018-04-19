@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import csv
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.svm import LinearSVC
 from sklearn.metrics import confusion_matrix
@@ -53,8 +54,23 @@ def extract_features(mail_dir, dictionary):
 
     return features_matrix
 
+def generate_result_dict(actual, predicted):
+    data = [["", "Actual", "Predicted"]];
+    for i in range(0, len(actual)):
+        data.append(["Email " + str(i), str(actual[i]), str(predicted[i])])
+
+    return data
+
+def export_to_csv(filename, data):
+    myFile = open(filename, 'w', newline="")
+    with myFile:
+        writer = csv.writer(myFile)
+        writer.writerows(data)
+
+
 # main
-train_dir = "C:\\Users\\ASUS i7\\Documents\\ADVSTAT\\lingspam_less_salt\\train-mails"
+# train_dir = "C:\\Users\\ASUS i7\\Documents\\ADVSTAT\\lingspam_less_salt\\train-mails"
+train_dir = "C:\\Users\\Luis Madrigal\\Documents\\ADVSTAT\\lingspam_less_salt\\train-mails"
 dictionary = make_dictionary(train_dir)
 
 # Prepare feature vectors per training mail and its labels
@@ -71,7 +87,8 @@ model1.fit(train_matrix,train_labels)
 model2.fit(train_matrix,train_labels)
 
 # Test the unseen mails for Spam
-test_dir = 'C:\\Users\\ASUS i7\\Documents\\ADVSTAT\\lingspam_less_salt\\test-mails'
+# test_dir = 'C:\\Users\\ASUS i7\\Documents\\ADVSTAT\\lingspam_less_salt\\test-mails'
+test_dir = 'C:\\Users\\Luis Madrigal\\Documents\\ADVSTAT\\lingspam_less_salt\\test-mails'
 test_matrix = extract_features(test_dir, dictionary)
 test_labels = np.zeros(260)
 test_labels[130:260] = 1
@@ -86,3 +103,6 @@ print(result2)
 print (len(result2))
 print(confusion_matrix(test_labels,result2))
 print(result3)
+
+export_to_csv("MultinomialNB.csv", generate_result_dict(test_labels, result1))
+export_to_csv("ConfusionMatrix.csv", confusion_matrix(test_labels, result1))
