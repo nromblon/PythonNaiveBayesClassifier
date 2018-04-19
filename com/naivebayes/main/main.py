@@ -17,7 +17,6 @@ class Application(tk.Frame):
 
     def __init__(self, master=None):
         tk.Frame.__init__(self, master)
-
         self.pack(expand=True, fill='both')
         # init widget variables
         self.quitButton = None
@@ -34,6 +33,8 @@ class Application(tk.Frame):
         self.train_matrix = None
         self.training_list = []
         self.test_list = []
+        self.test_matrix = None
+        self.test_labels = None
 
         self.init_widgets()
 
@@ -73,11 +74,12 @@ class Application(tk.Frame):
         self.test_listBox = tk.Listbox(test_listFrame, bg='white', selectmode="extended")
         self.test_listBox.pack(side='right', expand=True, fill='x')
         self.test_listBox.config(yscrollcommand=test_scrollbar.set)
-        test_scrollbar.config(command=self.train_listBox.yview)
+        test_scrollbar.config(command=self.test_listBox.yview)
         # end of list box frame
         listbox_Label = tk.Label(rightFrame, text="Select the files that are labelled as SPAM")
         listbox_Label.pack(side='top')
-        testButton = tk.Button(rightFrame, text="Test", command=self.train)
+        testButton = tk.Button(rightFrame, text="Test", command=self.test)
+        testButton.pack()
 
         self.quitButton = tk.Button(rightFrame, text='Quit', command=self.quit)
         self.quitButton.pack(side='bottom')
@@ -118,6 +120,19 @@ class Application(tk.Frame):
         # fit the naive bayes model with the feature vectors
         self.train_model.fit(self.train_matrix, self.train_labels)
         self.trainState_Label.config(text="Training Complete!")
+
+    def test(self):
+        # prepare labels and feature vectors for each test mail
+        self.test_matrix = self.extract_features(self.test_list, self.train_dict)
+        self.test_labels = np.zeros((len(self.test_list)))
+        # prepare labels and feature vectors for each testing mail
+        for i in range(0, len(self.training_list)):
+            if i in self.test_listBox.curselection():
+                self.test_labels[i] = 1
+
+        result = self.train_model.predict(self.test_matrix)
+        print(result)
+        print(confusion_matrix(self.test_labels, result))
 
     # ---NaiveBayes Util Functions
     @staticmethod
