@@ -1,10 +1,8 @@
-import os
 import numpy as np
 import tkinter as tk
+import csv
 from tkinter import filedialog as fd
-from tkinter.ttk import Progressbar
 from sklearn.naive_bayes import MultinomialNB
-from sklearn.svm import LinearSVC
 from sklearn.metrics import confusion_matrix
 from collections import Counter
 
@@ -19,13 +17,16 @@ class Application(tk.Frame):
         tk.Frame.__init__(self, master)
         self.pack(expand=True, fill='both')
         # init widget variables
-        self.quitButton = None
         self.train_browseButton = None
         self.train_listBox = None
         self.train_Progressbar = None
         self.trainState_Label = None
         self.train_model = MultinomialNB()
         self.test_listBox = None
+        self.view_listBox = None
+        self.predicted_label = None
+        self.actual_label = None
+        self.email_text = None
         # init naive bayes variables
         self.train_dirs = None
         self.train_dict = {}
@@ -35,6 +36,7 @@ class Application(tk.Frame):
         self.test_list = []
         self.test_matrix = None
         self.test_labels = None
+        self.result = None
 
         self.init_widgets()
 
@@ -52,7 +54,7 @@ class Application(tk.Frame):
         scrollbar = tk.Scrollbar(listFrame)
         scrollbar.pack(side='right', fill='y')
         self.train_listBox = tk.Listbox(listFrame, bg='white', selectmode="extended")
-        self.train_listBox.pack(side='right', expand=True, fill='x')
+        self.train_listBox.pack(side='right', expand=True, fill='both')
         self.train_listBox.config(yscrollcommand=scrollbar.set)
         scrollbar.config(command=self.train_listBox.yview)
         # end of list box frame
@@ -72,7 +74,7 @@ class Application(tk.Frame):
         test_scrollbar = tk.Scrollbar(test_listFrame)
         test_scrollbar.pack(side='right', fill='y')
         self.test_listBox = tk.Listbox(test_listFrame, bg='white', selectmode="extended")
-        self.test_listBox.pack(side='right', expand=True, fill='x')
+        self.test_listBox.pack(side='right', expand=True, fill='both')
         self.test_listBox.config(yscrollcommand=test_scrollbar.set)
         test_scrollbar.config(command=self.test_listBox.yview)
         # end of list box frame
@@ -81,16 +83,51 @@ class Application(tk.Frame):
         testButton = tk.Button(rightFrame, text="Test", command=self.test)
         testButton.pack()
 
-        self.quitButton = tk.Button(rightFrame, text='Quit', command=self.quit)
-        self.quitButton.pack(side='bottom')
-
         # left frame
         leftFrame = tk.Frame(self, bg="red")
         leftFrame.pack(expand=True, fill='both', side='right')
-        files_tkLabel2 = tk.Label(leftFrame, text="files")
-        files_tkLabel2.pack()
-        train_browseButton2 = tk.Button(leftFrame, text="Browse", command=self.browse_train)
-        train_browseButton2.pack()
+
+        # email traversal
+        view_listFrame = tk.Frame(leftFrame)
+        view_listFrame.pack(fill='both', expand=True, side='left')
+        view_scrollbar = tk.Scrollbar(view_listFrame)
+        view_scrollbar.pack(side='right', fill='y')
+        self.view_listBox = tk.Listbox(view_listFrame, bg='white', selectmode="browse")
+        self.view_listBox.pack(side='right', expand=True, fill='both')
+        self.view_listBox.bind(sequence='<<ListboxSelect>>', func=self.email_onselect)
+        self.view_listBox.config(yscrollcommand=view_scrollbar.set)
+        view_scrollbar.config(command=self.view_listBox.yview)
+
+        # email viewer
+        viewer_frame = tk.Frame(leftFrame)
+        viewer_frame.pack(fill='both', expand=True, side='left')
+        self.predicted_label = tk.Label(viewer_frame, text="Predicted: ")
+        self.predicted_label.pack()
+        self.actual_label = tk.Label(viewer_frame, text="Actual: ")
+        self.actual_label.pack()
+        # email body frame
+        text_frame = tk.Frame(viewer_frame)
+        text_frame.pack(fill='both', expand=True)
+        email_scrollbar = tk.Scrollbar(text_frame)
+        email_scrollbar.pack(side='right', fill='y')
+        self.email_text = tk.Text(text_frame, wrap='word')
+        self.email_text.pack(side='right', fill='both', expand=True)
+        self.email_text.config(yscrollcommand=email_scrollbar.set)
+        self.email_text.insert('end'," ")
+        email_scrollbar.config(command=self.email_text.yview)
+        # end of email body frame
+
+    def email_onselect(self, event):
+        index = self.view_listBox.curselection()
+        file = self.view_listBox.get(index)
+        self.email_text.delete(1.0, 'end')
+        with open(file, 'r') as m:
+            self.email_text.insert('end', m.read())
+            print(m.read())
+        res_text = "Spam" if self.result[index] == 1 else "Not Spam"
+        self.predicted_label.config(text="Predicted: " + res_text)
+        res_text = "Spam" if self.test_labels[index] == 1 else "Not Spam"
+        self.actual_label.config(text="Actual: " + res_text)
 
     def browse_train(self):
         self.training_list = list(fd.askopenfilenames())
@@ -121,6 +158,7 @@ class Application(tk.Frame):
         self.train_model.fit(self.train_matrix, self.train_labels)
         self.trainState_Label.config(text="Training Complete!")
 
+
     def test(self):
         # prepare labels and feature vectors for each test mail
         self.test_matrix = self.extract_features(self.test_list, self.train_dict)
@@ -130,9 +168,13 @@ class Application(tk.Frame):
             if i in self.test_listBox.curselection():
                 self.test_labels[i] = 1
 
-        result = self.train_model.predict(self.test_matrix)
-        print(result)
-        print(confusion_matrix(self.test_labels, result))
+        self.result = self.train_model.predict(self.test_matrix)
+        print(self.result)
+        print(confusion_matrix(self.test_labels, self.result))
+
+        self.view_listBox.delete(0, 'end')
+        for file in self.test_list:
+            self.view_listBox.insert('end', file)
 
     # ---NaiveBayes Util Functions
     @staticmethod
@@ -181,6 +223,21 @@ class Application(tk.Frame):
                 docID = docID + 1
 
         return features_matrix
+
+    @staticmethod
+    def generate_result_dict(actual, predicted):
+        data = [["", "Actual", "Predicted"]];
+        for i in range(0, len(actual)):
+            data.append(["Email " + str(i), str(actual[i]), str(predicted[i])])
+
+        return data
+
+    @staticmethod
+    def export_to_csv(filename, data):
+        myFile = open(filename, 'w', newline="")
+        with myFile:
+            writer = csv.writer(myFile)
+            writer.writerows(data)
 
 
 # MAIN
